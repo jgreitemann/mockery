@@ -5,4 +5,4 @@ authors = ["Jonas Greitemann <jgreitemann@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-clang = "1.0.3"
+clang = {version = "1.0.3", features = ["clang_3_8"] }
