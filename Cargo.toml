@@ -1,5 +1,5 @@
 [package]
-name = "clang-rs-example"
+name = "mockery"
 version = "0.1.0"
 authors = ["Jonas Greitemann <jgreitemann@gmail.com>"]
 edition = "2018"
