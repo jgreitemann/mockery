@@ -39,10 +39,10 @@ pub fn generate_mock_definition(interface_class: &Entity, mock_class_name: &str)
         .collect();
 
     format!(
-        "struct {} : {} {{\n{}\n}};",
+        "struct {} : {} {{\n\t{}\n}};",
         mock_class_name,
         get_qualified_name(interface_class),
-        mock_methods.join("\n")
+        mock_methods.join("\n\t")
     )
 }
 
