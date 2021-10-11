@@ -2,16 +2,13 @@ use clang::*;
 
 use crate::ast_iterators::IterableEntity;
 
-pub fn find_class_entity<'tu>(
-    tu: &'tu TranslationUnit,
-    class_name: &'tu str,
-) -> Option<Entity<'tu>> {
+pub fn find_class_entity<'tu>(tu: &'tu TranslationUnit, class_name: &str) -> Option<Entity<'tu>> {
     find_class_entity_impl(tu.get_entity().get_children(), class_name)
 }
 
 fn find_class_entity_impl<'tu>(
     entities: Vec<Entity<'tu>>,
-    class_name: &'tu str,
+    class_name: &str,
 ) -> Option<Entity<'tu>> {
     if entities.is_empty() {
         None
