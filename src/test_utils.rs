@@ -9,7 +9,7 @@ pub fn get_temp_cpp_filename() -> PathBuf {
     std::env::temp_dir().with_file_name("interface.cpp")
 }
 
-pub fn test_tu_from_source<R, C: Fn(&TranslationUnit)->R>(code: &str, callback: C) -> R {
+pub fn test_tu_from_source<R, C: Fn(&TranslationUnit) -> R>(code: &str, callback: C) -> R {
     CLANG.with(|clang| {
         let index = Index::new(clang, false, true);
         let file = Unsaved::new(get_temp_cpp_filename(), code);

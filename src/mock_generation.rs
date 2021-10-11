@@ -117,11 +117,12 @@ fn protect_commas(mut ty: String) -> String {
 
 fn get_qualified_name(entity: &Entity) -> String {
     itertools::Itertools::intersperse(
-        entity.semantic_parents()
-        .map(|e| e.get_display_name().unwrap())
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev(),
+        entity
+            .semantic_parents()
+            .map(|e| e.get_display_name().unwrap())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev(),
         "::".to_string(),
     )
     .collect()
@@ -129,8 +130,8 @@ fn get_qualified_name(entity: &Entity) -> String {
 
 #[cfg(test)]
 mod class_entity_location_tests {
-    use crate::test_utils::*;
     use super::*;
+    use crate::test_utils::*;
 
     #[test]
     fn class_entity_is_found_in_file() {
@@ -347,8 +348,8 @@ mod mock_method_tests {
 
 #[cfg(test)]
 mod generate_mock_class_from_interface {
-    use crate::test_utils::*;
     use super::*;
+    use crate::test_utils::*;
 
     #[test]
     fn mock_class_inherits_from_class() {

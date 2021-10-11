@@ -24,7 +24,9 @@ pub trait IterableEntity {
 
 impl<'a> IterableEntity for Entity<'a> {
     fn semantic_parents(&self) -> EntitySemanticParents {
-        EntitySemanticParents { next: Some(self.clone()) }
+        EntitySemanticParents {
+            next: Some(self.clone()),
+        }
     }
 }
 
@@ -40,17 +42,27 @@ pub fn dump_ast_to_string(e: &Entity) -> Result<String, ()> {
     String::from_utf8(cursor.into_inner()).map_err(|_| ())
 }
 
-fn dump_ast<W: std::io::Write>(out: &mut W, e: &Entity, indentation_level: usize) -> Result<(), ()> {
-    writeln!(out,
-             "{}{:?}: {:?} ({:?}, {:?}, {:?}, {:?})",
-             "\t".repeat(indentation_level),
-             e.get_name().unwrap_or("".to_string()),
-             e.get_kind(),
-             e.get_accessibility(),
-             if e.is_const_method() { Some("const") } else { None },
-             e.get_type().and_then(|t| t.get_ref_qualifier()),
-             e.get_exception_specification()
-    ).map_err(|_| ())?;
+fn dump_ast<W: std::io::Write>(
+    out: &mut W,
+    e: &Entity,
+    indentation_level: usize,
+) -> Result<(), ()> {
+    writeln!(
+        out,
+        "{}{:?}: {:?} ({:?}, {:?}, {:?}, {:?})",
+        "\t".repeat(indentation_level),
+        e.get_name().unwrap_or("".to_string()),
+        e.get_kind(),
+        e.get_accessibility(),
+        if e.is_const_method() {
+            Some("const")
+        } else {
+            None
+        },
+        e.get_type().and_then(|t| t.get_ref_qualifier()),
+        e.get_exception_specification()
+    )
+    .map_err(|_| ())?;
 
     for e in e.get_children().into_iter() {
         dump_ast(out, &e, indentation_level + 1)?;
@@ -61,13 +73,14 @@ fn dump_ast<W: std::io::Write>(out: &mut W, e: &Entity, indentation_level: usize
 
 #[cfg(test)]
 mod test {
-    use clang::TranslationUnit;
     use crate::ast_iterators::dump_ast_to_string;
     use crate::test_utils::test_tu_from_source;
+    use clang::TranslationUnit;
 
     #[test]
     fn dump_ast_for_simple_class() -> Result<(), ()> {
-        test_tu_from_source(r#"
+        test_tu_from_source(
+            r#"
             namespace Bar {
                 struct Foo {
                     struct Baz;
@@ -80,9 +93,11 @@ mod test {
                     int i = 42;
                 };
             }
-        "#, |tu: &TranslationUnit| -> Result<(), ()>{
-            assert_eq!(dump_ast_to_string(&tu.get_entity().get_children().first().unwrap())?.trim(),
-                       r#"
+        "#,
+            |tu: &TranslationUnit| -> Result<(), ()> {
+                assert_eq!(
+                    dump_ast_to_string(&tu.get_entity().get_children().first().unwrap())?.trim(),
+                    r#"
 "Bar": Namespace (None, None, None, None)
 	"Foo": StructDecl (None, None, None, None)
 		"Baz": StructDecl (Some(Public), None, None, None)
@@ -97,9 +112,11 @@ mod test {
 		"": AccessSpecifier (Some(Private), None, None, None)
 		"i": FieldDecl (Some(Private), None, None, None)
 			"": IntegerLiteral (None, None, None, None)
-						"#.trim());
-            Ok(())
-        })
+						"#
+                    .trim()
+                );
+                Ok(())
+            },
+        )
     }
 }
-

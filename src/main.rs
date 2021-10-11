@@ -2,8 +2,8 @@ mod ast_iterators;
 mod mock_generation;
 mod test_utils;
 
-use crate::mock_generation::*;
 use crate::ast_iterators::print_ast;
+use crate::mock_generation::*;
 use clang::*;
 use std::path::PathBuf;
 
