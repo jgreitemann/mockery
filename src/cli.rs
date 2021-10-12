@@ -14,8 +14,8 @@ pub struct MockeryOpts {
     /// The "search radius" around the provided source file in which the compile commands database
     /// is searched for if the path is not explicitly provided. Relative paths of up to this number
     /// of levels (either up or down), relative to the source file, are considered.
-    #[clap(short = 'r', long, default_value = "3")]
-    pub search_radius: u32,
+    #[clap(short = 'r', long, default_value = "2")]
+    pub search_radius: usize,
 
     /// A level of verbosity; can be used multiple times
     #[clap(short, long, parse(from_occurrences))]

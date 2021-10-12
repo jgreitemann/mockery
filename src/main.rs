@@ -1,14 +1,29 @@
 mod ast_iterators;
 mod cli;
+mod fs_iterators;
 mod mock_generation;
 mod test_utils;
 
 use crate::ast_iterators::print_ast;
 use crate::cli::*;
+use crate::fs_iterators::*;
 use crate::mock_generation::*;
 use clang::*;
 use clap::Clap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+fn find_compilation_database(
+    starting_point: &Path,
+    radius: usize,
+) -> Result<CompilationDatabase, ()> {
+    FilesystemDirectoryNode {
+        path: std::fs::canonicalize(starting_point).map_err(|_| ())?,
+    }
+    .search(radius)
+    .find(|path| path.join("compile_commands.json").exists())
+    .and_then(|path| CompilationDatabase::from_directory(&path).ok())
+    .ok_or(())
+}
 
 fn main() {
     let opts = MockeryOpts::parse();
@@ -19,7 +34,14 @@ fn main() {
         SubCommand::Dump(dmp) => &dmp.source[..],
     };
 
-    let compile_db = CompilationDatabase::from_directory(opts.compile_commands.unwrap()).unwrap();
+    let compile_db = match opts.compile_commands {
+        Some(path) => CompilationDatabase::from_directory(path),
+        None => {
+            find_compilation_database(Path::new(source_file).parent().unwrap(), opts.search_radius)
+        }
+    }
+    .unwrap();
+
     let commands = compile_db.get_compile_commands(source_file).unwrap();
     let command_vec = commands.get_commands();
     let command = command_vec.first().unwrap();
