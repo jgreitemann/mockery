@@ -2,6 +2,8 @@ mod ast_iterators;
 mod cli;
 mod fs_iterators;
 mod mock_generation;
+
+#[cfg(test)]
 mod test_utils;
 
 use crate::ast_iterators::print_ast;

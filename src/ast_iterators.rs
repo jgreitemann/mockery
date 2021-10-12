@@ -34,7 +34,8 @@ pub fn print_ast(e: &Entity) {
     dump_ast(&mut std::io::stdout(), e, 0).unwrap();
 }
 
-pub fn dump_ast_to_string(e: &Entity) -> Result<String, ()> {
+#[cfg(test)]
+fn dump_ast_to_string(e: &Entity) -> Result<String, ()> {
     use std::io::Cursor;
     let mut cursor = Cursor::new(Vec::<u8>::new());
     dump_ast(&mut cursor, e, 0)?;
