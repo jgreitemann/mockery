@@ -1,10 +1,9 @@
-use clap::{AppSettings, Clap};
+use clap::Parser;
 
 /// A tool for creating Google Mock mock class definitions based on the pure virtual member
 /// functions of an interface class, and for keeping the mock up-to-date as the interface evolves.
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = "0.1.0", author = "Jonas Greitemann <jgreitemann@gmail.com>")]
-#[clap(setting = AppSettings::ColoredHelp)]
 pub struct MockeryOpts {
     /// Path to the compile commands database (`compile_commands.json`). By default, we will try to
     /// find the database in the vicinity of the provided source file.
@@ -25,7 +24,7 @@ pub struct MockeryOpts {
     pub subcmd: SubCommand,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 pub enum SubCommand {
     Create(CreateOpts),
     Update(UpdateOpts),
@@ -33,8 +32,7 @@ pub enum SubCommand {
 }
 
 /// Create a mock class definition from scratch based on an interface class.
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
+#[derive(Parser)]
 pub struct CreateOpts {
     /// Path to a translation unit (*.cpp) which includes the interface that is to be mocked.
     pub interface_source: String,
@@ -62,8 +60,7 @@ pub struct CreateOpts {
 }
 
 /// Modify an existing mock class definition to mirror changes to the underlying interface class.
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
+#[derive(Parser)]
 pub struct UpdateOpts {
     /// Path to a translation unit (*.cpp) which includes the mock class which needs to be updated.
     pub mock_source: String,
@@ -90,8 +87,7 @@ pub struct UpdateOpts {
 }
 
 /// Dump the AST for the specified source file or class.
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
+#[derive(Parser)]
 pub struct DumpOpts {
     /// Path to a translation unit (*.cpp).
     pub source: String,

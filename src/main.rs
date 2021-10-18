@@ -11,7 +11,7 @@ use crate::cli::*;
 use crate::fs_iterators::*;
 use crate::mock_generation::*;
 use clang::*;
-use clap::Clap;
+use clap::Parser;
 use std::path::{Path, PathBuf};
 
 fn find_compilation_database(starting_point: &Path, radius: usize) -> Result<PathBuf, ()> {
