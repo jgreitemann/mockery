@@ -14,35 +14,36 @@ use clang::*;
 use clap::Clap;
 use std::path::{Path, PathBuf};
 
-fn find_compilation_database(
-    starting_point: &Path,
-    radius: usize,
-) -> Result<CompilationDatabase, ()> {
+fn find_compilation_database(starting_point: &Path, radius: usize) -> Result<PathBuf, ()> {
     FilesystemDirectoryNode {
         path: std::fs::canonicalize(starting_point).map_err(|_| ())?,
     }
     .search(radius)
     .find(|path| path.join("compile_commands.json").exists())
-    .and_then(|path| CompilationDatabase::from_directory(&path).ok())
     .ok_or(())
 }
 
 fn main() {
     let opts = MockeryOpts::parse();
 
-    let source_file = match &opts.subcmd {
+    let source_file = std::fs::canonicalize(match &opts.subcmd {
         SubCommand::Create(crt) => &crt.interface_source[..],
         SubCommand::Update(upd) => &upd.mock_source[..],
         SubCommand::Dump(dmp) => &dmp.source[..],
-    };
-
-    let compile_db = match opts.compile_commands {
-        Some(path) => CompilationDatabase::from_directory(path),
-        None => {
-            find_compilation_database(Path::new(source_file).parent().unwrap(), opts.search_radius)
-        }
-    }
+    })
     .unwrap();
+
+    let compile_db_dir = opts
+        .compile_commands
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            find_compilation_database(source_file.parent().unwrap(), opts.search_radius).unwrap()
+        });
+
+    std::env::set_current_dir(&compile_db_dir).unwrap();
+
+    let compile_db = CompilationDatabase::from_directory(compile_db_dir).unwrap();
 
     let commands = compile_db.get_compile_commands(source_file).unwrap();
     let command_vec = commands.get_commands();
