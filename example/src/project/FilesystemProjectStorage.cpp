@@ -1,5 +1,6 @@
 #include <project/FilesystemProjectStorage.h>
 
+#include <algorithm>
 #include <fstream>
 
 static Type TypeOfFileAtPath(std::filesystem::path const &path) {
