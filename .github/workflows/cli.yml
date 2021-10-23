@@ -1,0 +1,106 @@
+name: Rust Mockery CLI + Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  EXAMPLE_BUILD_TYPE: Release
+
+jobs:
+  configure-example:
+    name: Configure example
+    runs-on: ubuntu-latest
+
+    - uses: actions/checkout@v2
+      
+    - name: Configure example CMake
+      run: |
+        cmake -S ${{github.workspace}}/example \
+              -B ${{github.workspace}}/example/build \
+              -DCMAKE_BUILD_TYPE=${{env.EXAMPLE_BUILD_TYPE}} \
+              -DBUILD_TESTING=OFF
+    
+    - name: Upload example compilation database
+      uses: actions/upload-artifact@v2
+      with:
+          name: compile_commands.json
+          path: ${{github.workspace}}/example/build/compile_commands.json
+    
+  cargo-build-and-test:
+    name: Cargo build & test & run
+    needs: configure-example
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Install libclang
+      run: sudo apt install -y libclang-dev
+      
+    - name: Build Cargo project
+      run: cargo build --release --verbose
+      
+    - name: Run unit tests
+      run: cargo test --release --verbose -- --test-threads=1
+      
+    - name: Download example compilation database
+      uses: actions/download-artifact@v2
+      with:
+          name: compile_commands.json
+          path: ${{github.workspace}}/example/build/compile_commands.json
+
+    - name: Generate mock class definition for example
+      run: |
+        cargo run --release -- create ${{github.workspace}}/example/src/project/Project.cpp -i ProjectStorage | tee ${{github.workspace}}/example/test/ProjectStorageMock.h
+    
+    - name: Upload mock class definition for example
+      uses: actions/upload-artifact@v2
+      with:
+          name: ProjectStorageMock.h
+          path: ${{github.workspace}}/example/test/ProjectStorageMock.h
+      
+  build-and-test-example:
+    name: Build & test example project
+    runs-on: ubuntu-latest
+
+    - uses: actions/checkout@v2
+    
+    - name: Get Conan
+      uses: turtlebrowser/get-conan@v1.0
+      
+    - name: Create default Conan profile
+      run: conan profile new default --detect
+      
+    - name: Update Conan profile
+      run: >
+        conan profile update settings.build_type=${{env.EXAMPLE_BUILD_TYPE}}
+        conan profile update settings.compiler.cppstd=17 default
+        conan profile update settings.compiler.libcxx=libstdc++11 default
+      
+    - name: Install dependencies
+      run: conan install example --install-folder=${{github.workspace}}/example/build   
+      
+    - name: Download mock class definition for example
+      uses: actions/download-artifact@v2
+      with:
+          name: ProjectStorageMock.h
+          path: ${{github.workspace}}/example/test/ProjectStorageMock.h
+      
+    - name: Configure example CMake
+      run: |
+        cmake -S ${{github.workspace}}/example \
+              -B ${{github.workspace}}/example/build \
+              -DCMAKE_BUILD_TYPE=${{env.EXAMPLE_BUILD_TYPE}} \
+              -DBUILD_TESTING=ON
+      
+    - name: Build example
+      run: cmake --build ${{github.workspace}}/example/build
+
+    - name: Run example tests
+      working-directory: ${{github.workspace}}/example/build
+      run: ctest -C ${{env.EXAMPLE_BUILD_TYPE}}
+      
