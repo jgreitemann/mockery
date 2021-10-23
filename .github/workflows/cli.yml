@@ -79,7 +79,7 @@ jobs:
     
     - name: Update Conan profile
       run: |
-        conan profile update settings.build_type=${{env.EXAMPLE_BUILD_TYPE}}
+        conan profile update settings.build_type=${{env.EXAMPLE_BUILD_TYPE}} default
         conan profile update settings.compiler.cppstd=17 default
         conan profile update settings.compiler.libcxx=libstdc++11 default
     
