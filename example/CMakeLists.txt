@@ -4,7 +4,10 @@ project(mockery-example CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
+enable_testing()
 
 add_subdirectory(src)
-add_subdirectory(test)
+
+if(BUILD_TESTING)
+    add_subdirectory(test)
+endif()

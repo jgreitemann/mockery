@@ -5,7 +5,7 @@ psec () {
 }
 
 psec "Build example app, generating the compilation database"
-cmake -S example -B example/build -DCMAKE_BUILD_TYPE=Release
+cmake -S example -B example/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 cmake --build example/build --target example-app
 
 psec "Generate Mock class for example project"
