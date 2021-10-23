@@ -52,7 +52,7 @@ jobs:
       uses: actions/download-artifact@v2
       with:
           name: compile_commands.json
-          path: ${{github.workspace}}/example/build/compile_commands.json
+          path: ${{github.workspace}}/example/build
     
     - name: Generate mock class definition for example
       run: cargo run --release -- create ${{github.workspace}}/example/src/project/Project.cpp -i ProjectStorage | tee ${{github.workspace}}/example/test/ProjectStorageMock.h
@@ -90,7 +90,7 @@ jobs:
       uses: actions/download-artifact@v2
       with:
           name: ProjectStorageMock.h
-          path: ${{github.workspace}}/example/test/ProjectStorageMock.h
+          path: ${{github.workspace}}/example/test
     
     - name: Configure example CMake
       run: >
