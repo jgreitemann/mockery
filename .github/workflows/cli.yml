@@ -65,6 +65,7 @@ jobs:
   
   build-and-test-example:
     name: Build & test example project
+    needs: cargo-build-and-test
     runs-on: ubuntu-latest
     
     steps:
