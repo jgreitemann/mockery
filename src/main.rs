@@ -23,7 +23,7 @@ fn find_compilation_database(starting_point: &Path, radius: usize) -> Result<Pat
     .ok_or(())
 }
 
-fn main() {
+fn main() -> Result<(), String> {
     let opts = MockeryOpts::parse();
 
     let source_file = std::fs::canonicalize(match &opts.subcmd {
@@ -65,25 +65,38 @@ fn main() {
     let tu = index.parser(filename).arguments(&args).parse().unwrap();
 
     match opts.subcmd {
-        SubCommand::Create(crt) => {
-            if let Some(class) = find_class_entity(&tu, &crt.interface.unwrap()) {
-                let mock_class_name = crt
-                    .mock
-                    .unwrap_or(format!("{}Mock", class.get_display_name().unwrap()));
-                let mock_def = generate_mock_definition(&class, &mock_class_name);
-
-                println!("{}", mock_def);
-            }
-        }
-        SubCommand::Update(_) => {
-            panic!()
-        }
-        SubCommand::Dump(dmp) => {
-            let entity = dmp
-                .class
-                .and_then(|class_name| find_class_entity(&tu, &class_name))
-                .unwrap_or(tu.get_entity());
-            print_ast(&entity);
-        }
+        SubCommand::Create(crt) => create_subcommand(crt, tu),
+        SubCommand::Update(upd) => update_subcommand(upd, tu),
+        SubCommand::Dump(dmp) => dump_subcommand(dmp, tu),
     }
+}
+
+fn create_subcommand(crt: CreateOpts, tu: TranslationUnit) -> Result<(), String> {
+    if let Some(class) = find_class_entity(&tu, crt.interface.as_ref().unwrap()) {
+        let mock_class_name = &crt
+            .mock
+            .unwrap_or(format!("{}Mock", class.get_display_name().unwrap()));
+        let mock_def = generate_mock_definition(&class, &mock_class_name);
+
+        println!("{}", mock_def);
+        Ok(())
+    } else {
+        Err(format!(
+            "no interface class named `{}` was found in the specified translation unit",
+            &crt.interface.unwrap()
+        ))
+    }
+}
+
+fn update_subcommand(_upd: UpdateOpts, _tu: TranslationUnit) -> Result<(), String> {
+    Err("not yet implemented".to_string())
+}
+
+fn dump_subcommand(dmp: DumpOpts, tu: TranslationUnit) -> Result<(), String> {
+    let entity = dmp
+        .class
+        .and_then(|class_name| find_class_entity(&tu, &class_name))
+        .unwrap_or(tu.get_entity());
+    print_ast(&entity);
+    Ok(())
 }
