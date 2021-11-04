@@ -13,12 +13,13 @@ use crate::cli::*;
 use crate::error::*;
 use clang::*;
 use clap::Parser;
+use colored::Colorize;
 
 fn main() {
     match cli_main() {
         Ok(()) => (),
         Err(CLIError(msg)) => {
-            eprintln!("error: {}", msg);
+            eprintln!("{} {}", "error:".red().bold(), msg);
             std::process::exit(1);
         }
     }

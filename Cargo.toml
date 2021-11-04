@@ -7,4 +7,5 @@ edition = "2018"
 [dependencies]
 clang = { version = "1.0.3", features = ["clang_7_0"] }
 clap = { version = "3.0.0-beta.5", features = ["clap_derive"] }
+colored = "2.0.0"
 itertools = "0.10.1"
