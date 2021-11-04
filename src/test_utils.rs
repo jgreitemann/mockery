@@ -1,4 +1,6 @@
 use super::*;
+
+use crate::mock_generation::find_class_entity;
 use itertools::Itertools;
 use std::num::Wrapping;
 use std::path::PathBuf;
