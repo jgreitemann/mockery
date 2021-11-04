@@ -1,6 +1,7 @@
 mod app;
 mod ast_iterators;
 mod cli;
+mod error;
 mod fs_iterators;
 mod mock_generation;
 
@@ -9,6 +10,7 @@ mod test_utils;
 
 use crate::app::*;
 use crate::cli::*;
+use crate::error::*;
 use clang::*;
 use clap::Parser;
 
@@ -28,7 +30,7 @@ fn cli_main() -> CLIResult {
     let clang = Clang::new().unwrap();
     let index = Index::new(&clang, false, true);
 
-    let app = MockeryApp::new(&index, &opts);
+    let app = MockeryApp::new(&index, &opts)?;
 
     match opts.subcmd {
         SubCommand::Create(crt) => app.run_create(crt),
