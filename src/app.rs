@@ -45,6 +45,7 @@ impl<'i> MockeryApp<'i> {
             .get_arguments()
             .into_iter()
             .filter(|a| PathBuf::from(a) != filename)
+            .filter(|a| !["/Tc", "/TC", "/Tp", "/TP"].contains(&a.as_str()))
             .collect();
 
         // Parse a source file into a translation unit
