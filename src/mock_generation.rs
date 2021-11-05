@@ -17,6 +17,7 @@ fn find_class_entity_impl<'tu>(
             .iter()
             .cloned()
             .find(|&e| e.get_name() == Some(class_name.to_string()))
+            .filter(is_class_entity)
             .or_else(|| {
                 find_class_entity_impl(
                     entities
@@ -27,6 +28,13 @@ fn find_class_entity_impl<'tu>(
                     class_name,
                 )
             })
+    }
+}
+
+fn is_class_entity(entity: &Entity) -> bool {
+    match entity.get_kind() {
+        EntityKind::ClassDecl | EntityKind::StructDecl => true,
+        _ => false,
     }
 }
 
