@@ -80,15 +80,14 @@ impl Node for FilesystemDirectoryNode {
     }
 
     fn children(&self) -> Box<dyn Iterator<Item = Self>> {
-        Box::new(
-            self.path
-                .read_dir()
-                .unwrap()
+        match self.path.read_dir() {
+            Ok(contents) => Box::new(contents
                 .filter_map(Result::ok)
                 .map(|entry| entry.path())
                 .filter(|path| path.is_dir())
-                .map(|path| FilesystemDirectoryNode { path }),
-        )
+                .map(|path| FilesystemDirectoryNode { path })),
+            Err(_) => Box::new(std::iter::empty()),
+        }
     }
 }
 
