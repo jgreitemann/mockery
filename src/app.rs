@@ -55,7 +55,14 @@ impl<'i> MockeryApp<'i> {
     }
 
     pub fn run_create(&self, crt: CreateOpts) -> CLIResult {
-        if let Some(class) = find_class_entity(&self.tu, crt.interface.as_ref().unwrap()) {
+        let interface_name = crt.interface.as_ref().map_or(
+            Path::new(&crt.interface_source)
+                .file_stem()
+                .and_then(std::ffi::OsStr::to_str)
+                .unwrap(),
+            String::as_str,
+        );
+        if let Some(class) = find_class_entity(&self.tu, interface_name) {
             let mock_class_name = &crt
                 .mock
                 .unwrap_or(format!("{}Mock", class.get_display_name().unwrap()));
@@ -66,7 +73,7 @@ impl<'i> MockeryApp<'i> {
         } else {
             Err(CLIError(format!(
                 "No interface class named `{}` was found in the specified translation unit",
-                &crt.interface.unwrap()
+                interface_name
             )))
         }
     }
