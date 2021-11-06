@@ -1,5 +1,6 @@
 use crate::ast_iterators::print_ast;
 use crate::cli::*;
+use crate::error::CLIError::*;
 use crate::error::*;
 use crate::fs_iterators::*;
 use crate::mock_generation::*;
@@ -17,7 +18,7 @@ impl<'i> MockeryApp<'i> {
             SubCommand::Update(upd) => &upd.mock_source[..],
             SubCommand::Dump(dmp) => &dmp.source[..],
         })
-        .map_err(|e| CLIError(format!("Failed to open source file: {}", e)))?;
+        .map_err(|e| SourceFileNotFound(e))?;
 
         let compile_db_dir = opts
             .compile_commands
@@ -27,20 +28,18 @@ impl<'i> MockeryApp<'i> {
                 find_compilation_database(source_file.parent().unwrap(), opts.search_radius)
             })?;
 
-        std::env::set_current_dir(&compile_db_dir).unwrap();
+        std::env::set_current_dir(&compile_db_dir)
+            .map_err(|e| SpecifiedCompilationDatabaseNotFound(e))?;
 
-        let compile_db = CompilationDatabase::from_directory(&compile_db_dir).or(Err(CLIError(
-            "Could not find the specified compile commands database".to_string(),
-        )))?;
+        let compile_db = CompilationDatabase::from_directory(&compile_db_dir).unwrap();
 
         let commands = compile_db
             .get_compile_commands(&source_file)
-            .or(Err(CLIError(format!(
-                "Failed to find compile command for {:?} in database",
-                &source_file
-            ))))?;
+            .map_err(|()| CompileCommandNotFound(source_file.clone()))?;
         let command_vec = commands.get_commands();
-        let command = command_vec.first().unwrap();
+        let command = command_vec
+            .first()
+            .ok_or(CompileCommandNotFound(source_file))?;
         let filename = command.get_filename();
         let args: Vec<_> = command
             .get_arguments()
@@ -54,7 +53,7 @@ impl<'i> MockeryApp<'i> {
             .parser(filename)
             .arguments(&args)
             .parse()
-            .map_err(|e| CLIError(format!("The source file could not be parsed: {}", e)))?;
+            .map_err(|e| SourceError(e))?;
 
         Ok(MockeryApp { tu })
     }
@@ -76,15 +75,12 @@ impl<'i> MockeryApp<'i> {
             println!("{}", mock_def);
             Ok(())
         } else {
-            Err(CLIError(format!(
-                "No interface class named `{}` was found in the specified translation unit",
-                interface_name
-            )))
+            Err(InterfaceClassNotFound(interface_name.to_string()))
         }
     }
 
     pub fn run_update(&self, _upd: UpdateOpts) -> CLIResult<()> {
-        Err(CLIError("Not yet implemented".to_string()))
+        Err(NotYetImplemented)
     }
 
     pub fn run_dump(&self, dmp: DumpOpts) -> CLIResult<()> {
@@ -100,16 +96,10 @@ impl<'i> MockeryApp<'i> {
 fn find_compilation_database(starting_point: &Path, radius: usize) -> CLIResult<PathBuf> {
     FilesystemDirectoryNode {
         path: std::fs::canonicalize(starting_point).map_err(|e| {
-            CLIError(format!(
-                "Could not find the starting point '{}' for the compile commands database search: {}",
-                starting_point.to_str().unwrap(),
-                e
-            ))
+            CompilationDatabaseSearchStartingPointNotFound(starting_point.to_path_buf(), e)
         })?,
     }
     .search(radius)
     .find(|path| path.join("compile_commands.json").exists())
-    .ok_or(CLIError(
-        "Could not find compile commands database within the specified search radius".to_string(),
-    ))
+    .ok_or(CompilationDatabaseSearchFailed)
 }
