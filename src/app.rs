@@ -16,7 +16,8 @@ impl<'i> MockeryApp<'i> {
             SubCommand::Create(crt) => &crt.interface_source[..],
             SubCommand::Update(upd) => &upd.mock_source[..],
             SubCommand::Dump(dmp) => &dmp.source[..],
-        })?;
+        })
+        .map_err(|e| CLIError(format!("Failed to open source file: {}", e)))?;
 
         let compile_db_dir = opts
             .compile_commands
@@ -49,7 +50,11 @@ impl<'i> MockeryApp<'i> {
             .collect();
 
         // Parse a source file into a translation unit
-        let tu = index.parser(filename).arguments(&args).parse()?;
+        let tu = index
+            .parser(filename)
+            .arguments(&args)
+            .parse()
+            .map_err(|e| CLIError(format!("The source file could not be parsed: {}", e)))?;
 
         Ok(MockeryApp { tu })
     }
@@ -94,7 +99,13 @@ impl<'i> MockeryApp<'i> {
 
 fn find_compilation_database(starting_point: &Path, radius: usize) -> CLIResult<PathBuf> {
     FilesystemDirectoryNode {
-        path: std::fs::canonicalize(starting_point)?,
+        path: std::fs::canonicalize(starting_point).map_err(|e| {
+            CLIError(format!(
+                "Could not find the starting point '{}' for the compile commands database search: {}",
+                starting_point.to_str().unwrap(),
+                e
+            ))
+        })?,
     }
     .search(radius)
     .find(|path| path.join("compile_commands.json").exists())
