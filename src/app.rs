@@ -11,7 +11,7 @@ pub struct MockeryApp<'i> {
 }
 
 impl<'i> MockeryApp<'i> {
-    pub fn new(index: &'i Index, opts: &MockeryOpts) -> Result<Self, CLIError> {
+    pub fn new(index: &'i Index, opts: &MockeryOpts) -> CLIResult<Self> {
         let source_file = std::fs::canonicalize(match &opts.subcmd {
             SubCommand::Create(crt) => &crt.interface_source[..],
             SubCommand::Update(upd) => &upd.mock_source[..],
@@ -54,7 +54,7 @@ impl<'i> MockeryApp<'i> {
         Ok(MockeryApp { tu })
     }
 
-    pub fn run_create(&self, crt: CreateOpts) -> CLIResult {
+    pub fn run_create(&self, crt: CreateOpts) -> CLIResult<()> {
         let interface_name = crt.interface.as_ref().map_or(
             Path::new(&crt.interface_source)
                 .file_stem()
@@ -78,11 +78,11 @@ impl<'i> MockeryApp<'i> {
         }
     }
 
-    pub fn run_update(&self, _upd: UpdateOpts) -> CLIResult {
+    pub fn run_update(&self, _upd: UpdateOpts) -> CLIResult<()> {
         Err(CLIError("Not yet implemented".to_string()))
     }
 
-    pub fn run_dump(&self, dmp: DumpOpts) -> CLIResult {
+    pub fn run_dump(&self, dmp: DumpOpts) -> CLIResult<()> {
         let entity = dmp
             .class
             .and_then(|class_name| find_class_entity(&self.tu, &class_name))
@@ -92,7 +92,7 @@ impl<'i> MockeryApp<'i> {
     }
 }
 
-fn find_compilation_database(starting_point: &Path, radius: usize) -> Result<PathBuf, CLIError> {
+fn find_compilation_database(starting_point: &Path, radius: usize) -> CLIResult<PathBuf> {
     FilesystemDirectoryNode {
         path: std::fs::canonicalize(starting_point)?,
     }

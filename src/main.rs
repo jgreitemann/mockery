@@ -13,19 +13,15 @@ use crate::cli::*;
 use crate::error::*;
 use clang::*;
 use clap::Parser;
-use colored::Colorize;
 
 fn main() {
-    match cli_main() {
-        Ok(()) => (),
-        Err(CLIError(msg)) => {
-            eprintln!("{} {}", "error:".red().bold(), msg);
-            std::process::exit(1);
-        }
+    let res = cli_main();
+    if res.is_err() {
+        std::process::exit(res.report());
     }
 }
 
-fn cli_main() -> CLIResult {
+fn cli_main() -> CLIResult<()> {
     let opts = MockeryOpts::parse();
 
     let clang = Clang::new().unwrap();
