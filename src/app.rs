@@ -26,10 +26,17 @@ impl<'i> MockeryApp<'i> {
             .map(|s| Ok(PathBuf::from(s)))
             .unwrap_or_else(|| {
                 find_compilation_database(source_file.parent().unwrap(), opts.search_radius)
+            })
+            .and_then(|dir| {
+                std::fs::canonicalize(dir).map_err(|e| SpecifiedCompilationDatabaseNotFound(e))
             })?;
 
-        std::env::set_current_dir(&compile_db_dir)
+        compile_db_dir
+            .join("compile_commands.json")
+            .canonicalize()
             .map_err(|e| SpecifiedCompilationDatabaseNotFound(e))?;
+
+        std::env::set_current_dir(&compile_db_dir).unwrap();
 
         let compile_db = CompilationDatabase::from_directory(&compile_db_dir).unwrap();
 
