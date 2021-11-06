@@ -15,6 +15,10 @@ use clang::*;
 use clap::Parser;
 
 fn main() {
+    #[cfg(windows)]
+    {
+        let _ = ansi_term::enable_ansi_support();
+    }
     let res = cli_main();
     if res.is_err() {
         std::process::exit(res.report());

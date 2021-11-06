@@ -5,6 +5,7 @@ authors = ["Jonas Greitemann <jgreitemann@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+ansi_term = "0.12.1"
 clang = { version = "1.0.3", features = ["clang_7_0"] }
 clap = { version = "3.0.0-beta.5", features = ["clap_derive"] }
 colored = "2.0.0"
