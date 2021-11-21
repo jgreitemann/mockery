@@ -1,7 +1,6 @@
-use std::ops::Range;
 use std::path::PathBuf;
 
-pub trait Node: Sized + Clone + 'static {
+pub trait Node: Sized + Clone + PartialEq + 'static {
     type Item;
 
     fn content(&self) -> Self::Item;
@@ -9,16 +8,12 @@ pub trait Node: Sized + Clone + 'static {
     fn children(&self) -> Box<dyn Iterator<Item = Self>>;
 
     fn search(&self, radius: usize) -> Box<dyn Iterator<Item = Self::Item>> {
-        let (depth, start) = Parents(Some(self.clone()))
-            .enumerate()
-            .take(radius + 1)
-            .last()
-            .unwrap();
-
         Box::new(BreadthFirstTreeIter {
-            nodes: vec![start],
+            me: None,
+            parent: Some(self.clone()),
+            descendents: vec![],
+            degree: radius,
             index: 0,
-            levels: (0..(depth + radius)),
         })
     }
 }
@@ -35,32 +30,66 @@ impl<N: Node> Iterator for Parents<N> {
 }
 
 struct BreadthFirstTreeIter<N: Node> {
-    nodes: Vec<N>,
+    me: Option<N>,
+    parent: Option<N>,
+    descendents: Vec<N>,
+    degree: usize,
     index: usize,
-    levels: Range<usize>,
+}
+
+impl<N: Node> BreadthFirstTreeIter<N> {
+    fn relate(&mut self) -> bool {
+        if self.degree > 0 {
+            let next_descendents = self
+                .descendents
+                .iter()
+                .chain(self.parent.iter())
+                .flat_map(|n| n.children())
+                .filter(|n| Some(n) != self.me.as_ref())
+                .collect();
+            self.descendents = next_descendents;
+
+            let next_parent = self.parent.as_ref().and_then(|n| n.parent());
+            self.me = std::mem::replace(&mut self.parent, next_parent);
+            self.index = 0;
+            self.degree -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn get_node(&self, idx: usize) -> Option<&N> {
+        self.descendents.get(idx).or_else(|| {
+            if idx == self.descendents.len() {
+                self.parent.as_ref()
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl<N: Node> Iterator for BreadthFirstTreeIter<N> {
     type Item = N::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.nodes.is_empty() {
-            None
-        } else if self.index < self.nodes.len() {
-            let next_index = self.index + 1;
-            Some(self.nodes[std::mem::replace(&mut self.index, next_index)].content())
-        } else if !self.levels.is_empty() {
-            self.nodes = self.nodes.iter().flat_map(|n| n.children()).collect();
-            self.levels = (self.levels.start + 1)..self.levels.end;
-            self.index = 0;
-            self.next()
-        } else {
-            None
-        }
+        let idx = self.index;
+        self.index += 1;
+
+        let next = self.get_node(idx).map(|n| n.content()).or_else(|| {
+            if self.relate() {
+                self.next()
+            } else {
+                None
+            }
+        });
+
+        next
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct FilesystemDirectoryNode {
     pub path: PathBuf,
 }
@@ -81,11 +110,13 @@ impl Node for FilesystemDirectoryNode {
 
     fn children(&self) -> Box<dyn Iterator<Item = Self>> {
         match self.path.read_dir() {
-            Ok(contents) => Box::new(contents
-                .filter_map(Result::ok)
-                .map(|entry| entry.path())
-                .filter(|path| path.is_dir())
-                .map(|path| FilesystemDirectoryNode { path })),
+            Ok(contents) => Box::new(
+                contents
+                    .filter_map(Result::ok)
+                    .map(|entry| entry.path())
+                    .filter(|path| path.is_dir())
+                    .map(|path| FilesystemDirectoryNode { path }),
+            ),
             Err(_) => Box::new(std::iter::empty()),
         }
     }
@@ -95,13 +126,13 @@ impl Node for FilesystemDirectoryNode {
 mod test {
     use super::*;
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq)]
     struct TestTreeNode {
         content: i32,
         children: Vec<TestTreeNode>,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq)]
     struct TestNode {
         root: TestTreeNode,
         indices: Vec<usize>,
@@ -314,10 +345,7 @@ mod test {
             root: get_test_tree(),
             indices: vec![2],
         };
-        assert_eq!(
-            root.search(1).collect::<Vec<_>>(),
-            vec![0, 1, 6, 7, 2, 3, 5, 8]
-        );
+        assert_eq!(root.search(1).collect::<Vec<_>>(), vec![7, 8, 0]);
     }
 
     #[test]
@@ -326,9 +354,42 @@ mod test {
             root: get_test_tree(),
             indices: vec![2],
         };
+        assert_eq!(root.search(2).collect::<Vec<_>>(), vec![7, 8, 0, 9, 1, 6]);
+    }
+
+    #[test]
+    fn search_around_branch_with_radius_3() {
+        let root = TestNode {
+            root: get_test_tree(),
+            indices: vec![2],
+        };
         assert_eq!(
-            root.search(2).collect::<Vec<_>>(),
-            vec![0, 1, 6, 7, 2, 3, 5, 8, 4, 9]
+            root.search(3).collect::<Vec<_>>(),
+            vec![7, 8, 0, 9, 1, 6, 2, 3, 5]
+        );
+    }
+
+    #[test]
+    fn search_around_branch_with_radius_4() {
+        let root = TestNode {
+            root: get_test_tree(),
+            indices: vec![2],
+        };
+        assert_eq!(
+            root.search(4).collect::<Vec<_>>(),
+            vec![7, 8, 0, 9, 1, 6, 2, 3, 5, 4]
+        );
+    }
+
+    #[test]
+    fn search_around_leaf_with_radius_4() {
+        let root = TestNode {
+            root: get_test_tree(),
+            indices: vec![0, 1, 0],
+        };
+        assert_eq!(
+            root.search(4).collect::<Vec<_>>(),
+            vec![4, 3, 1, 2, 5, 0, 6, 7]
         );
     }
 }
