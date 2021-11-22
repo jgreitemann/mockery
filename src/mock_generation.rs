@@ -1,4 +1,6 @@
+use clang::token::TokenKind;
 use clang::*;
+use itertools::Itertools;
 
 use crate::ast_iterators::IterableEntity;
 
@@ -107,7 +109,8 @@ fn get_method_parameter_type_list(method: &Entity) -> Vec<String> {
         .get_arguments()
         .unwrap()
         .iter()
-        .map(|&e| e.get_type().unwrap().get_display_name())
+        .map(get_type_spelling)
+        .map(Option::unwrap)
         .collect::<Vec<_>>()
 }
 
@@ -131,6 +134,26 @@ fn get_qualified_name(entity: &Entity) -> String {
         "::".to_string(),
     )
     .collect()
+}
+
+fn get_type_spelling(e: &Entity) -> Option<String> {
+    e.get_range().map(|r| {
+        r.tokenize()
+            .into_iter()
+            .circular_tuple_windows()
+            .filter(|(t, _)| t.get_kind() != TokenKind::Comment)
+            .take_while(|(t, _)| Some(t.get_spelling()) != e.get_name())
+            .map(|(lhs, rhs)| {
+                let mut spelling = lhs.get_spelling();
+                if lhs.get_range().get_end() != rhs.get_range().get_start() {
+                    spelling.push_str(" ");
+                }
+                spelling
+            })
+            .join("")
+            .trim_end()
+            .to_string()
+    })
 }
 
 #[cfg(test)]
@@ -289,8 +312,32 @@ mod mock_method_tests {
     #[test]
     fn mock_definition_for_function_with_multiple_parameters() {
         assert_mock_for_function(
-            "virtual void foo(int const& x, double const*) = 0;",
-            "MOCK_METHOD(void, foo, (const int &, const double *), (override));",
+            "virtual void foo(const int &x, const double *y, float z) = 0;",
+            "MOCK_METHOD(void, foo, (const int &, const double *, float), (override));",
+        );
+    }
+
+    #[test]
+    fn mock_definition_for_function_with_unnamed_parameters() {
+        assert_mock_for_function(
+            "virtual void foo(const int&, const double*, float) = 0;",
+            "MOCK_METHOD(void, foo, (const int&, const double*, float), (override));",
+        );
+    }
+
+    #[test]
+    fn mock_definition_for_function_using_east_const() {
+        assert_mock_for_function(
+            "virtual void foo(int const& x, double const* y, float const z) = 0;",
+            "MOCK_METHOD(void, foo, (int const&, double const*, float const), (override));",
+        );
+    }
+
+    #[test]
+    fn mock_definition_for_function_with_comments_in_parameters() {
+        assert_mock_for_function(
+            "virtual void foo(const int& /* reference */ x , const double* y /* pointer */, const float /* z */) = 0;",
+            "MOCK_METHOD(void, foo, (const int&, const double*, const float), (override));",
         );
     }
 
