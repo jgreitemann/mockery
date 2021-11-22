@@ -11,7 +11,7 @@ pub fn get_temp_cpp_filename() -> PathBuf {
     std::env::temp_dir().with_file_name("interface.cpp")
 }
 
-pub fn test_tu_from_source<R, C: Fn(&TranslationUnit) -> R>(code: &str, callback: C) -> R {
+pub fn test_tu_from_source<R, C: FnOnce(&TranslationUnit) -> R>(code: &str, callback: C) -> R {
     CLANG.with(|clang| {
         let index = Index::new(clang, false, true);
         let file = Unsaved::new(get_temp_cpp_filename(), code);
@@ -27,7 +27,7 @@ pub fn test_tu_from_source<R, C: Fn(&TranslationUnit) -> R>(code: &str, callback
     })
 }
 
-pub fn test_class_from_source<C: Fn(Entity)>(code: &str, class_name: &str, callback: C) {
+pub fn test_class_from_source<C: FnOnce(Entity)>(code: &str, class_name: &str, callback: C) {
     test_tu_from_source(code, |tu| {
         callback(find_class_entity(tu, class_name).unwrap());
     })

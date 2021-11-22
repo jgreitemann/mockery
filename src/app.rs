@@ -77,7 +77,7 @@ impl<'i> MockeryApp<'i> {
             let mock_class_name = &crt
                 .mock
                 .unwrap_or(format!("{}Mock", class.get_display_name().unwrap()));
-            let mock_def = generate_mock_definition(&class, &mock_class_name);
+            let mock_def = generate_mock_definition(class, &mock_class_name);
 
             println!("{}", mock_def);
             Ok(())

@@ -40,11 +40,35 @@ fn is_class_entity(entity: &Entity) -> bool {
     }
 }
 
-pub fn generate_mock_definition(interface_class: &Entity, mock_class_name: &str) -> String {
-    let mock_methods: Vec<_> = interface_class
+fn get_direct_base_classes(class: Entity) -> impl Iterator<Item = Entity> {
+    use EntityKind::*;
+    class
         .get_children()
-        .iter()
+        .into_iter()
+        .filter_map(|e| match e.get_kind() {
+            BaseSpecifier => e.get_definition(),
+            _ => None,
+        })
+}
+
+fn get_all_base_classes(class: Entity) -> impl Iterator<Item = Entity> {
+    get_direct_base_classes(class).flat_map(|base| {
+        get_all_base_classes(base)
+            .chain([base])
+            .collect_vec()
+            .into_iter()
+    })
+}
+
+fn get_abstract_methods(class: Entity) -> impl Iterator<Item = Entity> {
+    get_all_base_classes(class)
+        .chain([class])
+        .flat_map(|e| e.get_children().into_iter())
         .filter(|e| e.is_pure_virtual_method())
+}
+
+pub fn generate_mock_definition(interface_class: Entity, mock_class_name: &str) -> String {
+    let mock_methods: Vec<_> = get_abstract_methods(interface_class)
         .map(format_mock_method_definition)
         .collect();
 
@@ -56,7 +80,7 @@ pub fn generate_mock_definition(interface_class: &Entity, mock_class_name: &str)
     )
 }
 
-fn format_mock_method_definition(method: &Entity) -> String {
+fn format_mock_method_definition(method: Entity) -> String {
     let attributes = [
         get_method_const_qualifier(&method),
         get_method_value_category_qualifier(&method),
@@ -108,7 +132,7 @@ fn get_method_parameter_type_list(method: &Entity) -> Vec<String> {
     method
         .get_arguments()
         .unwrap()
-        .iter()
+        .into_iter()
         .map(get_type_spelling)
         .map(Option::unwrap)
         .collect::<Vec<_>>()
@@ -123,7 +147,7 @@ fn protect_commas(mut ty: String) -> String {
     ty
 }
 
-fn get_qualified_name(entity: &Entity) -> String {
+fn get_qualified_name(entity: Entity) -> String {
     itertools::Itertools::intersperse(
         entity
             .semantic_parents()
@@ -136,7 +160,7 @@ fn get_qualified_name(entity: &Entity) -> String {
     .collect()
 }
 
-fn get_type_spelling(e: &Entity) -> Option<String> {
+fn get_type_spelling(e: Entity) -> Option<String> {
     e.get_range().map(|r| {
         r.tokenize()
             .into_iter()
@@ -239,10 +263,187 @@ mod class_entity_location_tests {
 }
 
 #[cfg(test)]
+mod find_base_classes_tests {
+    use super::*;
+    use crate::test_utils::*;
+
+    fn test_direct_base_classes(
+        source: &str,
+        derived_name: &str,
+        expected_bases: &[(EntityKind, Option<&str>)],
+    ) {
+        test_class_from_source(source, derived_name, |class| {
+            itertools::assert_equal(
+                expected_bases
+                    .iter()
+                    .map(|&(k, s)| (k, s.map(str::to_string))),
+                get_direct_base_classes(class).map(|e| (e.get_kind(), e.get_display_name())),
+            );
+        })
+    }
+
+    fn test_all_base_classes(
+        source: &str,
+        derived_name: &str,
+        expected_bases: &[(EntityKind, Option<&str>)],
+    ) {
+        test_class_from_source(source, derived_name, |class| {
+            itertools::assert_equal(
+                expected_bases
+                    .iter()
+                    .map(|&(k, s)| (k, s.map(str::to_string))),
+                get_all_base_classes(class).map(|e| (e.get_kind(), e.get_display_name())),
+            );
+        })
+    }
+
+    #[test]
+    fn find_single_public_direct_base_class() {
+        use EntityKind::*;
+        test_direct_base_classes(
+            r#"
+                struct Bar{};
+                struct Foo : Bar {};
+            "#,
+            "Foo",
+            &[(StructDecl, Some("Bar"))],
+        )
+    }
+
+    #[test]
+    fn find_single_private_direct_base_class() {
+        use EntityKind::*;
+        test_direct_base_classes(
+            r#"
+                class Bar{};
+                class Foo : Bar {};
+            "#,
+            "Foo",
+            &[(ClassDecl, Some("Bar"))],
+        )
+    }
+
+    #[test]
+    fn find_multiple_public_direct_base_classes() {
+        use EntityKind::*;
+        test_direct_base_classes(
+            r#"
+                struct Bar{};
+                class Baz{};
+                struct Foo : Bar, Baz {};
+            "#,
+            "Foo",
+            &[(StructDecl, Some("Bar")), (ClassDecl, Some("Baz"))],
+        )
+    }
+
+    #[test]
+    fn find_multiple_direct_base_classes_with_explicit_accessibility() {
+        use EntityKind::*;
+        test_direct_base_classes(
+            r#"
+                struct Bar{};
+                class Baz{};
+                struct Foo : public Bar, private Baz {};
+            "#,
+            "Foo",
+            &[(StructDecl, Some("Bar")), (ClassDecl, Some("Baz"))],
+        )
+    }
+
+    #[test]
+    fn find_direct_template_base_classes() {
+        use EntityKind::*;
+        test_direct_base_classes(
+            r#"
+                template <typename T> struct Bar{};
+                struct Foo : Bar<Foo> {};
+            "#,
+            "Foo",
+            &[(StructDecl, Some("Bar<Foo>"))],
+        )
+    }
+
+    #[test]
+    fn find_direct_base_classes_ignoring_indirect_bases() {
+        use EntityKind::*;
+        test_direct_base_classes(
+            r#"
+                struct Baz{};
+                struct Bar : Baz {};
+                struct Foo : Bar {};
+            "#,
+            "Foo",
+            &[(StructDecl, Some("Bar"))],
+        )
+    }
+
+    #[test]
+    fn find_all_base_classes_includes_indirect_bases() {
+        use EntityKind::*;
+        test_all_base_classes(
+            r#"
+                struct Grandparent {};
+                struct Parent : Grandparent {};
+                struct Me : Parent {};
+            "#,
+            "Me",
+            &[
+                (StructDecl, Some("Grandparent")),
+                (StructDecl, Some("Parent")),
+            ],
+        )
+    }
+
+    #[test]
+    fn find_all_base_classes_searches_multiple_generations() {
+        use EntityKind::*;
+        test_all_base_classes(
+            r#"
+                struct Greatgrandparent {};
+                struct Grandparent : Greatgrandparent {};
+                struct Parent : Grandparent {};
+                struct Me : Parent {};
+            "#,
+            "Me",
+            &[
+                (StructDecl, Some("Greatgrandparent")),
+                (StructDecl, Some("Grandparent")),
+                (StructDecl, Some("Parent")),
+            ],
+        )
+    }
+
+    #[test]
+    fn find_all_base_classes_follows_multiple_inheritance() {
+        use EntityKind::*;
+        test_all_base_classes(
+            r#"
+                struct Dede {};
+                struct Babaanne {};
+                struct Anneanne {};
+                struct Baba : Babaanne, Dede {};
+                struct Anne : Anneanne, Dede {};
+                struct Ben : Anne, Baba {};
+            "#,
+            "Ben",
+            &[
+                (StructDecl, Some("Anneanne")),
+                (StructDecl, Some("Dede")),
+                (StructDecl, Some("Anne")),
+                (StructDecl, Some("Babaanne")),
+                (StructDecl, Some("Dede")),
+                (StructDecl, Some("Baba")),
+            ],
+        )
+    }
+}
+
+#[cfg(test)]
 mod mock_method_tests {
     use super::*;
 
-    fn test_method_for_function<C: Fn(&Entity)>(func_decl: &str, callback: C) {
+    fn test_method_for_function<C: Fn(Entity)>(func_decl: &str, callback: C) {
         crate::test_utils::test_tu_from_source(
             &format!(
                 r#"
@@ -253,7 +454,7 @@ mod mock_method_tests {
             ),
             |tu| {
                 callback(
-                    find_class_entity(tu, "TestClass")
+                    *find_class_entity(tu, "TestClass")
                         .unwrap()
                         .get_children()
                         .first()
@@ -407,7 +608,7 @@ mod generate_mock_class_from_interface {
     fn mock_class_inherits_from_class() {
         test_class_from_source("struct Foo;", "Foo", |class| {
             assert_eq_upto_whitespace(
-                &generate_mock_definition(&class, "FooMock"),
+                &generate_mock_definition(class, "FooMock"),
                 "struct FooMock : Foo {};",
             )
         });
@@ -417,7 +618,7 @@ mod generate_mock_class_from_interface {
     fn mock_class_inherits_from_class_in_namespace() {
         test_class_from_source("namespace Bar { struct Foo; }", "Foo", |class| {
             assert_eq_upto_whitespace(
-                &generate_mock_definition(&class, "FooMock"),
+                &generate_mock_definition(class, "FooMock"),
                 "struct FooMock : Bar::Foo {};",
             )
         })
@@ -427,7 +628,7 @@ mod generate_mock_class_from_interface {
     fn mock_class_inherits_from_nested_class() {
         test_class_from_source("struct Bar { struct Foo; };", "Foo", |class| {
             assert_eq_upto_whitespace(
-                &generate_mock_definition(&class, "FooMock"),
+                &generate_mock_definition(class, "FooMock"),
                 "struct FooMock : Bar::Foo {};",
             )
         })
@@ -446,7 +647,7 @@ mod generate_mock_class_from_interface {
             "Foo",
             |class| {
                 assert_eq_upto_whitespace(
-                    &generate_mock_definition(&class, "FooMock"),
+                    &generate_mock_definition(class, "FooMock"),
                     r#"
                         struct FooMock : Foo {
                             MOCK_METHOD(void, baz, (), (override));
@@ -462,20 +663,52 @@ mod generate_mock_class_from_interface {
         test_class_from_source(
             r#"
                 struct Foo {
-                    virtual void foo() = 0;
-                    virtual void bar() const = 0;
                     virtual void baz() noexcept = 0;
+                    virtual void bar() const = 0;
+                    virtual void foo() = 0;
                 };
             "#,
             "Foo",
             |class| {
                 assert_eq_upto_whitespace(
-                    &generate_mock_definition(&class, "FooMock"),
+                    &generate_mock_definition(class, "FooMock"),
                     r#"
                         struct FooMock : Foo {
-                            MOCK_METHOD(void, foo, (), (override));
-                            MOCK_METHOD(void, bar, (), (const, override));
                             MOCK_METHOD(void, baz, (), (noexcept, override));
+                            MOCK_METHOD(void, bar, (), (const, override));
+                            MOCK_METHOD(void, foo, (), (override));
+                        };
+                    "#,
+                )
+            },
+        )
+    }
+
+    #[test]
+    fn pure_virtual_functions_of_derived_interfaces_are_mocked() {
+        test_class_from_source(
+            r#"
+                struct Baz {
+                    virtual void baz() noexcept = 0;
+                };
+                
+                struct Bar : Baz {
+                    virtual void bar() const = 0;
+                };
+                
+                struct Foo : Bar {
+                    virtual void foo() = 0;
+                };
+            "#,
+            "Foo",
+            |class| {
+                assert_eq_upto_whitespace(
+                    &generate_mock_definition(class, "FooMock"),
+                    r#"
+                        struct FooMock : Foo {
+                            MOCK_METHOD(void, baz, (), (noexcept, override));
+                            MOCK_METHOD(void, bar, (), (const, override));
+                            MOCK_METHOD(void, foo, (), (override));
                         };
                     "#,
                 )
