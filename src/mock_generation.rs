@@ -1,6 +1,8 @@
 use clang::token::TokenKind;
 use clang::*;
 use itertools::Itertools;
+use std::convert::identity;
+use std::iter::once;
 
 use crate::ast_iterators::IterableEntity;
 
@@ -40,7 +42,7 @@ fn is_class_entity(entity: &Entity) -> bool {
     }
 }
 
-fn get_direct_base_classes(class: Entity) -> impl Iterator<Item = Entity> {
+fn get_direct_base_classes(class: Entity) -> impl DoubleEndedIterator<Item = Entity> {
     use EntityKind::*;
     class
         .get_children()
@@ -51,10 +53,10 @@ fn get_direct_base_classes(class: Entity) -> impl Iterator<Item = Entity> {
         })
 }
 
-fn get_all_base_classes(class: Entity) -> impl Iterator<Item = Entity> {
+fn get_all_base_classes(class: Entity) -> impl DoubleEndedIterator<Item = Entity> {
     get_direct_base_classes(class).flat_map(|base| {
-        get_all_base_classes(base)
-            .chain([base])
+        get_all_base_classes(base.clone())
+            .chain(once(base))
             .collect_vec()
             .into_iter()
     })
@@ -62,15 +64,29 @@ fn get_all_base_classes(class: Entity) -> impl Iterator<Item = Entity> {
 
 fn get_abstract_methods(class: Entity) -> impl Iterator<Item = Entity> {
     get_all_base_classes(class)
-        .chain([class])
+        .chain(once(class))
         .flat_map(|e| e.get_children().into_iter())
-        .filter(|e| e.is_pure_virtual_method())
+        .rev()
+        .scan(Vec::<Entity>::new(), |impls, method| {
+            if let Some(mut overridden_methods) = method.get_overridden_methods() {
+                impls.append(&mut overridden_methods);
+            }
+            Some(
+                if method.is_pure_virtual_method() && !impls.contains(&method) {
+                    Some(method)
+                } else {
+                    None
+                },
+            )
+        })
+        .filter_map(identity)
 }
 
 pub fn generate_mock_definition(interface_class: Entity, mock_class_name: &str) -> String {
-    let mock_methods: Vec<_> = get_abstract_methods(interface_class)
+    let mut mock_methods: Vec<_> = get_abstract_methods(interface_class)
         .map(format_mock_method_definition)
         .collect();
+    mock_methods.reverse();
 
     format!(
         "struct {} : {} {{\n\t{}\n}};",
@@ -708,6 +724,38 @@ mod generate_mock_class_from_interface {
                         struct FooMock : Foo {
                             MOCK_METHOD(void, baz, (), (noexcept, override));
                             MOCK_METHOD(void, bar, (), (const, override));
+                            MOCK_METHOD(void, foo, (), (override));
+                        };
+                    "#,
+                )
+            },
+        )
+    }
+
+    #[test]
+    fn pure_virtual_functions_of_bases_are_not_mocked_when_already_implemented() {
+        test_class_from_source(
+            r#"
+                struct Baz {
+                    virtual void baz() noexcept = 0;
+                };
+                
+                struct Bar : Baz {
+                    void baz() noexcept override;
+                    virtual void bar() const = 0;
+                };
+                
+                struct Foo : Bar {
+                    void bar() const override;
+                    virtual void foo() = 0;
+                };
+            "#,
+            "Foo",
+            |class| {
+                assert_eq_upto_whitespace(
+                    &generate_mock_definition(class, "FooMock"),
+                    r#"
+                        struct FooMock : Foo {
                             MOCK_METHOD(void, foo, (), (override));
                         };
                     "#,
