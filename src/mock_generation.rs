@@ -504,6 +504,14 @@ mod mock_method_tests {
     }
 
     #[test]
+    fn mock_definition_for_function_with_east_const_return_type() {
+        assert_mock_for_function(
+            "virtual int const& foo() = 0;",
+            "MOCK_METHOD(int const&, foo, (), (override));",
+        );
+    }
+
+    #[test]
     fn mock_definition_for_function_with_trailing_return_type() {
         assert_mock_for_function(
             "virtual auto foo() -> int = 0;",
@@ -544,7 +552,7 @@ mod mock_method_tests {
     }
 
     #[test]
-    fn mock_definition_for_function_using_east_const() {
+    fn mock_definition_for_function_using_east_const_parameters() {
         assert_mock_for_function(
             "virtual void foo(int const& x, double const* y, float const z) = 0;",
             "MOCK_METHOD(void, foo, (int const&, double const*, float const), (override));",
@@ -784,6 +792,58 @@ mod generate_mock_class_from_interface {
                             MOCK_METHOD(void, foo, (), (override));
                         };
                     "#,
+                )
+            },
+        )
+    }
+
+    #[test]
+    fn function_parameter_types_are_fully_qualified_for_interface_in_namespace() {
+        test_class_from_source(
+            r#"
+                namespace Bar {
+                    struct Param {};
+                    
+                    struct Foo {
+                        virtual void foo(Param) = 0;
+                    };
+                }
+            "#,
+            "Foo",
+            |class| {
+                assert_eq_upto_whitespace(
+                    &generate_mock_definition(class, "FooMock"),
+                    r#"
+                    struct FooMock : Bar::Foo {
+                        MOCK_METHOD(void, foo, (Bar::Param), (override));
+                    };
+                "#,
+                )
+            },
+        )
+    }
+
+    #[test]
+    fn function_return_type_is_fully_qualified_for_interface_in_namespace() {
+        test_class_from_source(
+            r#"
+                namespace Bar {
+                    struct Param {};
+                    
+                    struct Foo {
+                        virtual Param foo() = 0;
+                    };
+                }
+            "#,
+            "Foo",
+            |class| {
+                assert_eq_upto_whitespace(
+                    &generate_mock_definition(class, "FooMock"),
+                    r#"
+                    struct FooMock : Bar::Foo {
+                        MOCK_METHOD(Bar::Param, foo, (), (override));
+                    };
+                "#,
                 )
             },
         )
