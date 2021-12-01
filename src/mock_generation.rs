@@ -180,9 +180,9 @@ fn get_type_spelling(e: Entity) -> Option<String> {
     e.get_range().map(|r| {
         r.tokenize()
             .into_iter()
+            .dropping_back(if e.get_name().is_some() { 1 } else { 0 })
             .circular_tuple_windows()
             .filter(|(t, _)| t.get_kind() != TokenKind::Comment)
-            .take_while(|(t, _)| Some(t.get_spelling()) != e.get_name())
             .map(|(lhs, rhs)| {
                 let mut spelling = lhs.get_spelling();
                 if lhs.get_range().get_end() != rhs.get_range().get_start() {
@@ -464,6 +464,7 @@ mod mock_method_tests {
             &format!(
                 r#"
                     template <typename T, typename U> struct pair;
+                    namespace std {{ struct string; }}
                     struct TestClass {{ {} }};
                 "#,
                 func_decl
@@ -547,6 +548,30 @@ mod mock_method_tests {
         assert_mock_for_function(
             "virtual void foo(int const& x, double const* y, float const z) = 0;",
             "MOCK_METHOD(void, foo, (int const&, double const*, float const), (override));",
+        );
+    }
+
+    #[test]
+    fn mock_definition_for_function_with_parameter_type_in_namespace() {
+        assert_mock_for_function(
+            "virtual void foo(std::string x) = 0;",
+            "MOCK_METHOD(void, foo, (std::string), (override));",
+        );
+    }
+
+    #[test]
+    fn mock_definition_for_function_where_parameter_name_matches_parameter_type() {
+        assert_mock_for_function(
+            "virtual void foo(std::string string) = 0;",
+            "MOCK_METHOD(void, foo, (std::string), (override));",
+        );
+    }
+
+    #[test]
+    fn mock_definition_for_function_where_parameter_name_matches_namespace() {
+        assert_mock_for_function(
+            "virtual void foo(std::string std) = 0;",
+            "MOCK_METHOD(void, foo, (std::string), (override));",
         );
     }
 
