@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "type": "cargo",
+            "name": "Cargo Run",
+            "cargoArgs": ["run", "--", "create", "example/src/project/Project.cpp", "-i", "ProjectStorage"],
+            "environment": {
+                "DYLD_LIBRARY_PATH": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib"
+            },
+        },
+        {
+            "type": "command",
+            "name": "Configure example CMake project",
+            "program": "cmake",
+            "args": ["-S", "example", "-B", "example/cmake-build-debug", "-G", "Ninja"],
+        }
+    ]
+}
